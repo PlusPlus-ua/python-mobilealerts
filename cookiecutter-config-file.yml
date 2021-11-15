@@ -1,0 +1,13 @@
+# This file contains values from Cookiecutter
+
+default_context:
+  project_name: "python-mobilealerts"
+  project_description: "Python classes for MobileAlerts gateway and sensors"
+  organization: "PlusPlus-ua"
+  license: "MIT"
+  minimal_python_version: 3.7
+  github_name: "PlusPlus-ua"
+  email: "alexplas@gmail.com"
+  version: "0.1.0"
+  line_length: "88"
+  create_example_template: "none"
