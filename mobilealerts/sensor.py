@@ -663,6 +663,20 @@ class Sensor:
             result += "\n" + str(measurement)
         return result
 
+    def str_utc(self) -> str:
+        """Return a readable representation of the sensor. Timestamp is formatted as UTC datetime"""
+        timestamp_struct: time.struct_time = time.gmtime(self._timestamp)
+
+        result: str = ("id: %s (battery %s, last %s: %s)") % (
+            self._id,
+            "low" if self._low_battery else "good",
+            "event" if self._by_event else "seen",
+            time.strftime("%Y-%m-%d %H:%M:%S", timestamp_struct),
+        )
+        for measurement in self._measurements:
+            result += "\n" + str(measurement)
+        return result
+
     def _append(
         self,
         type: MeasurementType,
