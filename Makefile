@@ -14,7 +14,7 @@ poetry-remove:
 #* Installation
 .PHONY: install
 install:
-	poetry lock -n && poetry export --without-hashes > requirements.txt
+	poetry lock -n && poetry export --without-hashes > requirements_dev.txt
 	poetry install -n
 	-poetry run mypy --install-types --non-interactive ./
 
