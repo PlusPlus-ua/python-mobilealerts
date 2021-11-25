@@ -1,4 +1,4 @@
-"""Tests for hello function."""
+"""Tests for MobileAlerts Sensor class."""
 from typing import List
 
 import pytest
@@ -33,6 +33,13 @@ from mobilealerts import Sensor
             "Temperature: 20.0°C; previous: 20.1°C\n"
             "Humidity: 47%; previous: 47%\n"
             "Pool temperature: error; previous: error",
+        ),
+        (
+            "E161950AB225083F2CAA2B4203FF400900E095189BAD83E58C6AC515C3F3D642C41EC607C2AC00000000000000000000000000000000000000000000000000",
+            "id: 083F2CAA2B42 (battery good, last seen: 2021-11-17 13:59:14)\n"
+            "Temperature: 0.9°C\n"
+            "Rain: 56.0 mm\n"
+            "Time span: 3 days, 18:00:00; previous: [4 days, 22:05:00; 16:37:00; 2 days, 4:58:00]",
         ),
     ],
 )

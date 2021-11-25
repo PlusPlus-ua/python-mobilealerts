@@ -9,7 +9,7 @@ import time
 
 from aiohttp import web
 
-from .gateway import Gateway, _SensorHandler
+from .gateway import Gateway, SensorHandler
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class Proxy:
 
     def __init__(
         self,
-        handler: _SensorHandler,
+        handler: SensorHandler,
         local_ip_address: str = "",
     ) -> None:
         self._handler = handler

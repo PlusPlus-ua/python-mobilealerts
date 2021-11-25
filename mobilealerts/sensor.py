@@ -29,7 +29,7 @@ class MeasurementType(IntEnum):
     KEY_PRESS_TYPE = auto()
 
 
-MEASUREMENT_TYPES = (
+MEASUREMENT_TYPES = [
     "Temperature",
     "Humidity",
     "Wetness",
@@ -44,7 +44,7 @@ MEASUREMENT_TYPES = (
     "Door/Window",
     "Key pressed",
     "Key press type",
-)
+]
 
 
 class MeasurementError(IntEnum):
@@ -55,11 +55,11 @@ class MeasurementError(IntEnum):
     NOT_CALCULATED = auto()
 
 
-MEASUREMENT_ERRORS = (
+MEASUREMENT_ERRORS = [
     "error",
     "overflow",
     "not calculcated",
-)
+]
 
 
 class WindDirection(IntEnum):
@@ -792,6 +792,10 @@ class Sensor:
             return
         self._last_update = packet
         _LOGGER.debug("Sensor updated: %r", self)
+
+    @property
+    def sensor_id(self) -> str:
+        return self._id
 
     @property
     def last_update(self) -> Optional[bytes]:

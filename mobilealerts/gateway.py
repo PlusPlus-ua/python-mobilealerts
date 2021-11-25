@@ -17,7 +17,7 @@ from .sensor import Sensor
 
 _LOGGER = logging.getLogger(__name__)
 
-_SensorHandler = Callable[[Sensor], Awaitable[None]]
+SensorHandler = Callable[[Sensor], Awaitable[None]]
 
 #: all communication with the gateways are broadcasts
 BROADCAST_ADDR = "255.255.255.255"
@@ -53,7 +53,7 @@ class Gateway:
     ) -> None:
         self._id: bytes = bytes.fromhex(gateway_id)
         self._local_ip_address: Optional[str] = local_ip_address
-        self._handler: Optional[_SensorHandler] = None
+        self._handler: Optional[SensorHandler] = None
         self._version = "1.50"
         self._last_seen: Optional[float] = None
         self._attached = False
@@ -308,15 +308,17 @@ class Gateway:
 
         return result
 
-    @property
-    def gateway_id(self) -> str:
-        return self._id.hex().upper()
+    def set_handler(
+        self,
+        handler: Optional[SensorHandler],
+    ) -> None:
+        self._handler = handler
 
     def attach_to_proxy(
         self,
         proxy: str,
         proxy_port: int,
-        handler: _SensorHandler,
+        handler: SensorHandler,
     ) -> None:
         """Attachs the gateway to the proxy to read measuremnts.
 
@@ -327,10 +329,10 @@ class Gateway:
             self._orig_proxy = self._proxy
             self._orig_proxy_port = self._proxy_port
         self._attached = True
-        self._handler = handler
         self._use_proxy = True
         self._proxy = IPv4Address(proxy)
         self._proxy_port = proxy_port
+        self.set_handler(handler)
         self.set_config()
         # await self.get_config()
 
@@ -340,11 +342,11 @@ class Gateway:
             self._use_proxy = self._orig_use_proxy
             self._proxy = self._orig_proxy
             self._proxy_port = self._orig_proxy_port
-        self._handler = None
         self._attached = False
         self._orig_use_proxy = None
         self._orig_proxy = None
         self._orig_proxy_port = None
+        self.set_handler(None)
         self.set_config()
 
     def handle_bootup_update(self, package: bytes) -> None:
@@ -361,13 +363,18 @@ class Gateway:
             )
             self._last_seen = time.time()
 
+    def add_sensor(self, sensor: Sensor) -> None:
+        """Add sensor object."""
+        self._sensors[sensor.sensor_id] = sensor
+
     def create_sensor(self, sensor_id: str) -> Sensor:
+        """Create new sensor object for given ID."""
         result = Sensor(self, sensor_id)
-        self._sensors[sensor_id] = result
+        self.add_sensor(result)
         return result
 
     def get_sensor(self, sensor_id: str) -> Sensor:
-        """Returns sensor object for given ID, creates the sensor if not exists."""
+        """Return sensor object for given ID, creates the sensor if not exists."""
         result = self._sensors.get(sensor_id, None)
         if not result:
             result = self.create_sensor(sensor_id)
@@ -411,7 +418,7 @@ class Gateway:
         elif code == "C0":
             await self.handle_sensors_update(packages)
         else:
-            _LOGGER.info(
+            _LOGGER.error(
                 "Unknnow update code %d, data %s",
                 code,
                 packages.hex().upper(),
@@ -428,7 +435,7 @@ class Gateway:
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.put(
-                        url, headers=headers, data=content
+                        str(url), headers=headers, data=content
                     ) as response:
                         response_content = await response.content.read()
                         _LOGGER.debug(
@@ -438,6 +445,10 @@ class Gateway:
                         )
             except Exception as e:
                 _LOGGER.error("Error resending request to cloud: %r", e)
+
+    @property
+    def gateway_id(self) -> str:
+        return self._id.hex().upper()
 
     @property
     def serial(self) -> str:
