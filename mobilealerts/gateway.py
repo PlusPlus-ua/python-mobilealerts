@@ -122,7 +122,7 @@ class Gateway:
             sock.sendto(packet, (BROADCAST_ADDR, PORT))
             if wait_for_result:
                 loop = asyncio.get_event_loop()
-                config = await loop.sock_recv(sock, 256)
+                config = await asyncio.wait_for(loop.sock_recv(sock, 256), timeout)
                 self._last_seen = time.time()
                 return config
             else:
@@ -288,9 +288,10 @@ class Gateway:
             sock.sendto(packet, (BROADCAST_ADDR, PORT))
             while True:
                 try:
-                    config = await loop.sock_recv(sock, 256)
-                    # config, host = sock.recvfrom(256)
+                    config = await asyncio.wait_for(loop.sock_recv(sock, 256), timeout)
                 except socket.timeout:
+                    break
+                except asyncio.TimeoutError:
                     break
                 if Gateway.check_config(config):
                     gateway_id = config[2:8]
@@ -302,7 +303,6 @@ class Gateway:
                     gateway = Gateway(gateway_id.hex().upper(), local_ip_address)
                     await gateway.init(config)
                     result.append(gateway)
-                    # yield gateway
         finally:
             sock.close()
 
