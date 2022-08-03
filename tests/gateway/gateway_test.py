@@ -4,7 +4,6 @@ from typing import List, Optional
 
 import asyncio
 
-import asynctest
 import pytest
 
 from mobilealerts import Gateway, Sensor
