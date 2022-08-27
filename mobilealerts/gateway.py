@@ -578,6 +578,10 @@ class Gateway:
     def orig_proxy_port(self) -> int:
         return int(self._orig_proxy_port)
 
+    @property
+    def sensors(self):
+        return self._sensors.values()
+
     def __repr__(self) -> str:
         """Return a formal representation of the gateway."""
         return (

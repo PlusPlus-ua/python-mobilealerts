@@ -21,10 +21,25 @@ class Proxy:
         self,
         handler: SensorHandler,
         local_ip_address: str = "",
+        local_port: int = 0,
     ) -> None:
         self._handler = handler
         self._gateways: Dict[str, Gateway] = dict()
         self._local_ip_address = local_ip_address
+        self._local_port = local_port
+
+    async def _start(
+        self,
+    ) -> None:
+        """Internal start proxy server."""
+        self._site = web.TCPSite(self._runner, self._local_ip_address, self._local_port)
+        await self._site.start()
+        server: Any = self._site._server
+        sockets: List[socket.socket] = server._sockets
+        address = sockets[0].getsockname()
+        self._host = str(address[0])
+        self._port = int(address[1])
+        _LOGGER.debug("Proxy started on address %s:%s", self._host, self._port)
 
     async def start(
         self,
@@ -33,14 +48,7 @@ class Proxy:
         self._server = web.Server(self.request_handler)
         self._runner = web.ServerRunner(self._server)
         await self._runner.setup()
-        self._site = web.TCPSite(self._runner, self._local_ip_address, 0)
-        await self._site.start()
-        server: Any = self._site._server
-        sockets: List[socket.socket] = server._sockets  # __getattribute__('_sockets')
-        address = sockets[0].getsockname()
-        self._host = str(address[0])
-        self._port = int(address[1])
-        _LOGGER.debug("Proxy started on address %s:%s", self._host, self._port)
+        await self._start()
 
     async def stop(
         self,
@@ -48,6 +56,17 @@ class Proxy:
         """Stop proxy server and detach all attached gateways."""
         await self._site.stop()
         self.detach_all_gateways()
+
+    async def restart(
+        self,
+        local_ip_address: str = "",
+        local_port: int = 0,
+    ) -> None:
+        """Restart proxy server on new IP address and port."""
+        await self._site.stop()
+        self._local_ip_address = local_ip_address
+        self._local_port = local_port
+        await self._start()
 
     async def request_handler(self, request: web.BaseRequest) -> web.StreamResponse:
         response = await self.send_response_to_gateway(request)
@@ -117,6 +136,10 @@ class Proxy:
 
     def __del__(self) -> None:
         self.detach_all_gateways()
+
+    @property
+    def gateways(self):
+        return self._gateways.values()
 
     @property
     def host(self) -> str:
