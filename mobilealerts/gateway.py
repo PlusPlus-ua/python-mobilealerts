@@ -4,6 +4,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 import asyncio
 import logging
+import re
 import socket
 import struct
 import time
@@ -17,7 +18,8 @@ from .sensor import Sensor
 
 _LOGGER = logging.getLogger(__name__)
 
-SensorHandler = Callable[[Sensor], Awaitable[None]]
+# SensorHandler = Callable[[Any, Sensor], Awaitable[None]]
+#
 
 #: all communication with the gateways are broadcasts
 BROADCAST_ADDR = "255.255.255.255"
@@ -41,6 +43,16 @@ ORIG_PROXY_BYTE1 = 0x19
 #: 'Magic' byte #1 to mark preserved original proxy settings
 ORIG_PROXY_BYTE2 = 0x74
 #: 'Magic' byte #2 to mark preserved original proxy settings
+
+
+class SensorHandler:
+    """Abstract class of MobileAlerts senso's handler."""
+
+    async def sensor_added(self, sensor: Sensor) -> None:
+        pass
+
+    async def sensor_updated(self, sensor: Sensor) -> None:
+        pass
 
 
 class Gateway:
@@ -78,11 +90,13 @@ class Gateway:
     async def init(
         self,
         config: Optional[bytes] = None,
-    ) -> None:
+    ) -> bool:
         if config is None:
             config = await self.get_config()
         if config is not None:
-            self.parse_config(config)
+            return self.parse_config(config)
+        else:
+            return False
 
     def _check_init(self) -> None:
         if not self._initialized:
@@ -130,9 +144,27 @@ class Gateway:
         finally:
             sock.close()
 
-    async def get_config(self, timeout: int = 2) -> Optional[bytes]:
+    async def get_config(self, timeout: int = 30) -> Optional[bytes]:
         """Obtains configuration from the gateway."""
-        return await self.send_command(FIND_GATEWAY, True, timeout)
+        _LOGGER.debug(
+            "Gateway get_config for id=%s, timeout=%s", self.gateway_id, str(timeout)
+        )
+        result = None
+        start_time = time.time()
+        while True:
+            if (time.time() - start_time) > timeout:
+                break
+            try:
+                result = await self.send_command(FIND_GATEWAY, True, 5)
+                break
+            except socket.timeout:
+                _LOGGER.debug("Gateway FIND_GATEWAY timeout")
+                continue
+            except asyncio.TimeoutError:
+                _LOGGER.debug("Gateway FIND_GATEWAY timeout")
+                continue
+
+        return result
 
     @staticmethod
     def check_config(config: bytes) -> bool:
@@ -286,9 +318,12 @@ class Gateway:
 
         try:
             sock.sendto(packet, (BROADCAST_ADDR, PORT))
+            _LOGGER.debug("Gateways discovering packet sent")
+            start_time = time.time()
             while True:
                 try:
-                    config = await asyncio.wait_for(loop.sock_recv(sock, 256), timeout)
+                    config = await asyncio.wait_for(loop.sock_recv(sock, 256), 1)
+                    _LOGGER.debug("Gateways discovering response received %r", config)
                 except socket.timeout:
                     break
                 except asyncio.TimeoutError:
@@ -303,6 +338,8 @@ class Gateway:
                     gateway = Gateway(gateway_id.hex().upper(), local_ip_address)
                     await gateway.init(config)
                     result.append(gateway)
+                if (time.time() - start_time) > timeout:
+                    break
         finally:
             sock.close()
 
@@ -318,7 +355,7 @@ class Gateway:
         self,
         proxy: str,
         proxy_port: int,
-        handler: SensorHandler,
+        handler: Optional[SensorHandler],
     ) -> None:
         """Attachs the gateway to the proxy to read measuremnts.
 
@@ -367,17 +404,50 @@ class Gateway:
         """Add sensor object."""
         self._sensors[sensor.sensor_id] = sensor
 
-    def create_sensor(self, sensor_id: str) -> Sensor:
+    @staticmethod
+    async def get_sensor_name(sensor_id: str) -> Optional[str]:
+        """Try to receive name of the sensor from the cloud."""
+        try:
+            url = (
+                "https://measurements.mobile-alerts.eu/Home"
+                + "/MeasurementDetails?deviceid=%s"
+                + "&vendorid=9ac3a789-6f6a-47bf-8cf5-f076f532fe64"
+                + "&appbundle=eu.mobile_alerts.mobilealerts"
+            ) % (sensor_id)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(str(url)) as response:
+                    response_content: str = await response.text()
+            match = re.search(r"<h3>(.*) [^ <]+<\/h3>", response_content)
+            if match:
+                name = match.group(1)
+            else:
+                name = None
+            _LOGGER.debug("Discovered sensor name: %s", name)
+            return name
+        except Exception as e:
+            _LOGGER.error("Error discovering sensor name: %r", e)
+            return None
+
+    async def create_sensor(self, sensor_id: str) -> Sensor:
         """Create new sensor object for given ID."""
-        result = Sensor(self, sensor_id)
+        name: Optional[str] = await Gateway.get_sensor_name(sensor_id)
+        result = Sensor(self, sensor_id, name)
         self.add_sensor(result)
         return result
 
-    def get_sensor(self, sensor_id: str) -> Sensor:
+    async def get_sensor(self, sensor_id: str) -> Sensor:
         """Return sensor object for given ID, creates the sensor if not exists."""
         result = self._sensors.get(sensor_id, None)
-        if not result:
-            result = self.create_sensor(sensor_id)
+        if result is None:
+            result = await self.create_sensor(sensor_id)
+            _LOGGER.debug("New sensor is discovered: %r", result)
+            if (
+                result is not None
+                and self._handler
+                and callable(getattr(self._handler, "sensor_added", None))
+            ):
+                await self._handler.sensor_added(result)
+
         return result
 
     async def handle_sensor_update(self, package: bytes, package_checksum: int) -> None:
@@ -396,15 +466,20 @@ class Gateway:
         if checksum == package_checksum:
             self._last_seen = time.time()
             sensor_id = package[6:12].hex().upper()
-            sensor = self.get_sensor(sensor_id)
+            sensor = await self.get_sensor(sensor_id)
             sensor.parse_packet(package)
-            if self._handler:
-                await self._handler(sensor)
+            if self._handler and callable(
+                getattr(self._handler, "sensor_updated", None)
+            ):
+                await self._handler.sensor_updated(sensor)
+        else:
+            _LOGGER.info("Update package checksum error")
 
     async def handle_sensors_update(self, packages: bytes) -> None:
         """Handle update packet for few sensors."""
         pos = 0
         packages_len = len(packages)
+
         while pos + 64 <= packages_len:
             await self.handle_sensor_update(
                 packages[pos : pos + 63], packages[pos + 63]
@@ -579,8 +654,8 @@ class Gateway:
         return int(self._orig_proxy_port)
 
     @property
-    def sensors(self):
-        return self._sensors.values()
+    def sensors(self) -> List[Sensor]:
+        return [*self._sensors.values()]
 
     def __repr__(self) -> str:
         """Return a formal representation of the gateway."""

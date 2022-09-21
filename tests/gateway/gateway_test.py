@@ -6,13 +6,14 @@ import asyncio
 
 import pytest
 
-from mobilealerts import Gateway, Sensor
+from mobilealerts import Gateway, Sensor, SensorHandler
 
 _sensor: Optional[Sensor] = None
 
 
-async def sensor_discovered_handler(sensor: Sensor) -> None:
-    assert (sensor is not None) and (sensor.sensor_id == "1829EFCB988D")
+class SensorDiscoveredHandler(SensorHandler):
+    async def sensor_added(self, sensor: Sensor) -> None:
+        assert (sensor is not None) and (sensor.sensor_id == "1829EFCB988D")
 
 
 def test_sensor_discovered() -> None:
@@ -21,7 +22,7 @@ def test_sensor_discovered() -> None:
     my_loop = asyncio.new_event_loop()
     try:
         gateway: Gateway = Gateway("001D8C0EA927")
-        gateway.set_handler(sensor_discovered_handler)
+        gateway.set_handler(SensorDiscoveredHandler())
         my_loop.run_until_complete(
             gateway.handle_update(
                 "C0",
@@ -37,10 +38,10 @@ def test_sensor_discovered() -> None:
         my_loop.close()
 
 
-@coroutine
-async def sensor_added_handler(sensor: Sensor) -> None:
-    global _sensor
-    assert _sensor == sensor
+class SensorAddedHandler(SensorHandler):
+    async def sensor_updated(self, sensor: Sensor) -> None:
+        global _sensor
+        assert _sensor == sensor
 
 
 def test_sensor_added() -> None:
@@ -50,7 +51,7 @@ def test_sensor_added() -> None:
         gateway: Gateway = Gateway("001D8C0EA927")
         _sensor = Sensor(gateway, "1829EFCB988D")
         gateway.add_sensor(_sensor)
-        gateway.set_handler(sensor_added_handler)
+        gateway.set_handler(SensorAddedHandler())
         my_loop.run_until_complete(
             gateway.handle_update(
                 "C0",

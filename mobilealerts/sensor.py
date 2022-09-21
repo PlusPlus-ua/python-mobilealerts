@@ -1,6 +1,6 @@
 """MobileAlerts sensors."""
 
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import datetime
 import logging
@@ -8,6 +8,9 @@ import time
 from enum import IntEnum, auto
 
 _LOGGER = logging.getLogger(__name__)
+
+
+UNKNOWN = "Unknown"
 
 
 class MeasurementType(IntEnum):
@@ -33,7 +36,7 @@ MEASUREMENT_TYPES = [
     "Temperature",
     "Humidity",
     "Wetness",
-    "Air quality",
+    "CO2",
     "Air pressure",
     "Rain",
     "Time span",
@@ -62,45 +65,48 @@ MEASUREMENT_ERRORS = [
 ]
 
 
-class WindDirection(IntEnum):
-    """Directions of wind."""
+SENSOR_MODELS = {
+    0x01: "MA10120",
+    0x02: "MA10100",
+    0x03: "MA10250",
+    0x04: "MA10350",
+    0x05: "WL2000",
+    0x06: "MA10700",
+    0x07: "MA10410",
+    0x08: "MA10650",
+    0x09: "MA10120",
+    0x0A: "MA10860",
+    0x0B: "MA10660",
+    0x0E: "TFA30.3312.02",
+    0x0F: "MA10450",
+    0x10: "MA10800",
+    0x11: "TFA30.3060.01",
+    0x12: "MA10230",
+    0x15: "MA10880",
+    0x18: "MA10238",
+}
 
-    N = 0
-    NNE = 1
-    NE = 2
-    ENE = 3
-    E = 4
-    ESE = 5
-    SE = 6
-    SSE = 7
-    S = 8
-    SSW = 9
-    SW = 10
-    WSW = 11
-    W = 12
-    WNW = 13
-    NW = 14
-    NNW = 15
 
-
-WIND_DIRECTIONS = [
-    "North",
-    "North-northeast",
-    "Northeast",
-    "East-northeast",
-    "East",
-    "East-southeast",
-    "Southeast",
-    "South-Southeast",
-    "South",
-    "South-southwest",
-    "Southwest",
-    "West-southwest",
-    "West",
-    "West-northwest",
-    "Northwest",
-    "Northnorthwest",
-]
+SENSOR_NAMES = {
+    0x01: "Temperature sensor in/cable",
+    0x02: "Temperature sensor",
+    0x03: "Temperature/Humidity",
+    0x04: "Temperature/Humidity/Water Detector sensor",
+    0x05: "Air Quality Monitor",
+    0x06: "Temperature/Humidity/Pool sensor",
+    0x07: "Weather Station",
+    0x08: "Rain sensor",
+    0x09: "Pro Temperature/Humidity/Ext.Temperature sensor",
+    0x0A: "Sensor for acoustical observation of detectors",
+    0x0B: "Wind sensor",
+    0x0E: "Professional Thermo/Hygro sensor",
+    0x0F: "Weather Station",
+    0x10: "Door/Window sensor",
+    0x11: "4 Thermo-hygro-sensors",
+    0x12: "Humidity Guard",
+    0x15: "4 button switch",
+    0x18: "Air pressure monitor",
+}
 
 
 def _parse_temperature(
@@ -160,8 +166,8 @@ def _parse_rain_time_span(value: int) -> int:
     return (value & 0x3FFF) * time_mult
 
 
-def _parse_wind_direction(value: int) -> int:
-    return WindDirection((value & 0xF0000000) >> 28)
+def _parse_wind_direction(value: int) -> float:
+    return ((value & 0xF0000000) >> 28) * 22.5
 
 
 def _parse_wind_speed(
@@ -225,6 +231,14 @@ class Measurement:
         return self._value
 
     @property
+    def index(self) -> int:
+        return self._index
+
+    @property
+    def prefix(self) -> Optional[str]:
+        return self._prefix
+
+    @property
     def has_prior_value(self) -> bool:
         return self._prior is not None
 
@@ -274,7 +288,7 @@ class Measurement:
         ):
             return "m/s"
         elif self._type == MeasurementType.WIND_DIRECTION:
-            return WIND_DIRECTIONS
+            return "°"
         elif self._type == MeasurementType.DOOR_WINDOW:
             return ["closed", "opened"]
         elif self._type == MeasurementType.KEY_PRESSED:
@@ -292,6 +306,7 @@ class Measurement:
         elif self._type in [
             MeasurementType.TEMPERATURE,
             MeasurementType.HUMIDITY,
+            MeasurementType.WIND_DIRECTION,
         ]:
             return str(round(value, 1)) + str(self.unit())
         elif self._type in [
@@ -307,7 +322,6 @@ class Measurement:
         elif self._type in [
             MeasurementType.WETNESS,
             MeasurementType.ALARM,
-            MeasurementType.WIND_DIRECTION,
             MeasurementType.DOOR_WINDOW,
             MeasurementType.KEY_PRESSED,
             MeasurementType.KEY_PRESS_TYPE,
@@ -517,7 +531,7 @@ class Measurement:
         self,
         value: int,
     ) -> None:
-        self._value = value & 0xF0 >> 4
+        self._value = (value & 0xF0) >> 4
 
     def _set_key_press_type(
         self,
@@ -529,11 +543,17 @@ class Measurement:
 class Sensor:
     """Receive data from Mobile Alerts/WeatherHub sensor."""
 
-    def __init__(self, parent: Any, sensor_id: str) -> None:
+    def __init__(self, parent: Any, sensor_id: str, name: Optional[str] = None) -> None:
         self._id = sensor_id
         self._type_id = int(sensor_id[0:2], 16)
 
         self._parent = parent
+
+        self._model = SENSOR_MODELS.get(self._type_id, UNKNOWN)
+
+        if name is None:
+            name = (SENSOR_NAMES.get(self._type_id, UNKNOWN) + " (%s)") % sensor_id
+        self._name = name
 
         self._counter = -1
         self._low_battery = False
@@ -541,9 +561,11 @@ class Sensor:
         self._timestamp = time.time()
         self._last_update: Optional[bytes] = None
 
-        self._measurements: List[Measurement] = []
+        self._name = name
 
+        self._measurements: List[Measurement] = []
         self._three_byte_counter = False
+
         if self._type_id == 0x01 or self._type_id == 0x0F:
             self._append(MeasurementType.TEMPERATURE)
             self._append(MeasurementType.TEMPERATURE, "Cable")
@@ -618,7 +640,7 @@ class Sensor:
             self._append(MeasurementType.HUMIDITY)
             self._append(MeasurementType.AIR_PRESSURE)
         else:
-            _LOGGER.error("Unknow sensor type: %s", self._type_id)
+            _LOGGER.error("Unknow sensor type: %s", hex(self._type_id))
 
     def __len__(self) -> int:
         return len(self._measurements)
@@ -630,6 +652,7 @@ class Sensor:
         """Return a formal representation of the sensor."""
         result: str = (
             "%s.%s(%s), "
+            "id = %s, "
             "counter = %s, "
             "low_battery = %s, "
             "by_event = %s, "
@@ -638,6 +661,7 @@ class Sensor:
         ) % (
             self.__class__.__module__,
             self.__class__.__qualname__,
+            self._name,
             self._id,
             self._counter,
             self._low_battery,
@@ -653,7 +677,8 @@ class Sensor:
 
     def __str__(self) -> str:
         """Return a readable representation of the sensor."""
-        result: str = ("id: %s (battery %s, last %s: %s)") % (
+        result: str = ("%s (id: %s, battery %s, last %s: %s)") % (
+            self._name,
             self._id,
             "low" if self._low_battery else "good",
             "event" if self._by_event else "seen",
@@ -789,13 +814,20 @@ class Sensor:
             self[2]._set_air_preasure(packet[18:20], packet[23:25])
         else:
             _LOGGER.error("Unknow sensor update package %s", packet.hex().upper())
-            return
         self._last_update = packet
         _LOGGER.debug("Sensor updated: %r", self)
 
     @property
     def sensor_id(self) -> str:
         return self._id
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def model(self) -> str:
+        return self._model
 
     @property
     def last_update(self) -> Optional[bytes]:

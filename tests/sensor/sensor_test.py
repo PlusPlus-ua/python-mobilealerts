@@ -41,6 +41,16 @@ from mobilealerts import Sensor
             "Rain: 56.0 mm\n"
             "Time span: 3 days, 18:00:00; previous: [4 days, 22:05:00; 16:37:00; 2 days, 4:58:00]",
         ),
+        (
+            "ce5d8bcb801215ffffffffff4023128e0b04060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "id: 15FFFFFFFFFF (battery good, last event: 2019-09-25 20:18:08)\n"
+            "Key pressed: green\n"
+            "Key press type: double",
+        ),
+        (
+            "ce5d8bcb801275ffffffffff4023128e0b04060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+            "id: 75FFFFFFFFFF (battery good, last event: 2019-09-25 20:18:08)",
+        ),
     ],
 )
 def test_sensor(data: str, expected: str) -> None:

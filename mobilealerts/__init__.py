@@ -1,14 +1,8 @@
 from typing import Sequence
 
-from .gateway import Gateway
+from .gateway import Gateway, SensorHandler
 from .proxy import Proxy
-from .sensor import (
-    Measurement,
-    MeasurementError,
-    MeasurementType,
-    Sensor,
-    WindDirection,
-)
+from .sensor import Measurement, MeasurementError, MeasurementType, Sensor
 
 __all__: Sequence[str] = [
     "Gateway",
@@ -17,5 +11,5 @@ __all__: Sequence[str] = [
     "MeasurementError",
     "MeasurementType",
     "Sensor",
-    "WindDirection",
+    "SensorHandler",
 ]

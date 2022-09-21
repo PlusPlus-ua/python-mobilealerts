@@ -1,6 +1,6 @@
 """MobileAlerts proxy."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import logging
 import socket
@@ -19,11 +19,11 @@ class Proxy:
 
     def __init__(
         self,
-        handler: SensorHandler,
+        handler: Optional[SensorHandler],
         local_ip_address: str = "",
         local_port: int = 0,
     ) -> None:
-        self._handler = handler
+        self._handler: Optional[SensorHandler] = handler
         self._gateways: Dict[str, Gateway] = dict()
         self._local_ip_address = local_ip_address
         self._local_port = local_port
@@ -136,6 +136,12 @@ class Proxy:
 
     def __del__(self) -> None:
         self.detach_all_gateways()
+
+    def set_handler(self, handler: Optional[SensorHandler]) -> None:
+        self._handler = handler
+
+    def get_gateway_by_id(self, gateway_id: str) -> Gateway:
+        return self._gateways[gateway_id]
 
     @property
     def gateways(self):
