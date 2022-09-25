@@ -84,7 +84,9 @@ class Proxy:
                         content = await request.content.read(
                             int(request.headers["Content-Length"])
                         )
-                        await gateway.handle_update(identify[2], content)
+                        await gateway.handle_update(
+                            identify[2], content, request.remote
+                        )
                         await gateway.resend_data_to_cloud(
                             request.rel_url, headers, content
                         )
@@ -144,8 +146,8 @@ class Proxy:
         return self._gateways[gateway_id]
 
     @property
-    def gateways(self):
-        return self._gateways.values()
+    def gateways(self) -> List[Gateway]:
+        return [*self._gateways.values()]
 
     @property
     def host(self) -> str:

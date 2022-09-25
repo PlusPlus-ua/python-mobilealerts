@@ -1,6 +1,6 @@
 """MobileAlerts sensors."""
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import datetime
 import logging
@@ -19,7 +19,7 @@ class MeasurementType(IntEnum):
     TEMPERATURE = auto()
     HUMIDITY = auto()
     WETNESS = auto()
-    AIR_QUALITY = auto()
+    CO2 = auto()
     AIR_PRESSURE = auto()
     RAIN = auto()
     TIME_SPAN = auto()
@@ -32,7 +32,7 @@ class MeasurementType(IntEnum):
     KEY_PRESS_TYPE = auto()
 
 
-MEASUREMENT_TYPES = [
+MEASUREMENT_TYPES: List[str] = [
     "Temperature",
     "Humidity",
     "Wetness",
@@ -58,54 +58,109 @@ class MeasurementError(IntEnum):
     NOT_CALCULATED = auto()
 
 
-MEASUREMENT_ERRORS = [
+MEASUREMENT_ERRORS: List[str] = [
     "error",
     "overflow",
     "not calculcated",
 ]
 
 
-SENSOR_MODELS = {
-    0x01: "MA10120",
-    0x02: "MA10100",
-    0x03: "MA10250",
-    0x04: "MA10350",
-    0x05: "WL2000",
-    0x06: "MA10700",
-    0x07: "MA10410",
-    0x08: "MA10650",
-    0x09: "MA10120",
-    0x0A: "MA10860",
-    0x0B: "MA10660",
-    0x0E: "TFA30.3312.02",
-    0x0F: "MA10450",
-    0x10: "MA10800",
-    0x11: "TFA30.3060.01",
-    0x12: "MA10230",
-    0x15: "MA10880",
-    0x18: "MA10238",
-}
-
-
-SENSOR_NAMES = {
-    0x01: "Temperature sensor in/cable",
-    0x02: "Temperature sensor",
-    0x03: "Temperature/Humidity",
-    0x04: "Temperature/Humidity/Water Detector sensor",
-    0x05: "Air Quality Monitor",
-    0x06: "Temperature/Humidity/Pool sensor",
-    0x07: "Weather Station",
-    0x08: "Rain sensor",
-    0x09: "Pro Temperature/Humidity/Ext.Temperature sensor",
-    0x0A: "Sensor for acoustical observation of detectors",
-    0x0B: "Wind sensor",
-    0x0E: "Professional Thermo/Hygro sensor",
-    0x0F: "Weather Station",
-    0x10: "Door/Window sensor",
-    0x11: "4 Thermo-hygro-sensors",
-    0x12: "Humidity Guard",
-    0x15: "4 button switch",
-    0x18: "Air pressure monitor",
+"""
+Dictionary with information about sensors by ID: 
+model of sensor, description (also used as default name) and
+measurements update interval (in seconds)
+"""
+SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
+    0x01: (
+        "MA10120",
+        "Temperature sensor in/cable",
+        7 * 60,  # 7 min
+    ),
+    0x02: (
+        "MA10100",
+        "Temperature sensor",
+        7 * 60,  # 7 min
+    ),
+    0x03: (
+        "MA10250",
+        "Temperature/Humidity",
+        7 * 60,  # 7 min
+    ),
+    0x04: (
+        "MA10350",
+        "Temperature/Humidity/Water Detector sensor",
+        7 * 60,  # 7 min
+    ),
+    0x05: (
+        "WL2000",
+        "Air Quality Monitor",
+        7 * 60,  # 7 min
+    ),
+    0x06: (
+        "MA10700",
+        "Temperature/Humidity/Pool sensor",
+        7 * 60,  # 7 min
+    ),
+    0x07: (
+        "MA10410",
+        "Weather Station",
+        6 * 60,  # 6 min
+    ),
+    0x08: (
+        "MA10650",
+        "Rain sensor",
+        2 * 60 * 60,  # 2 hours
+    ),
+    0x09: (
+        "MA10120",
+        "Pro Temperature/Humidity/Ext.Temperature sensor",
+        3 * 60 + 30,  # 3.5 min
+    ),
+    0x0A: (
+        "MA10860",
+        "Sensor for acoustical observation of detectors",
+        0,  # Unknown
+    ),
+    0x0B: (
+        "MA10660",
+        "Wind sensor",
+        6 * 60,  # 6 min
+    ),
+    0x0E: (
+        "TFA30.3312.02",
+        "Professional Thermo/Hygro sensor",
+        3 * 60 + 30,  # 3.5 min
+    ),
+    0x0F: (
+        "MA10450",
+        "Weather Station",
+        7 * 60,  # 7 min
+    ),
+    0x10: (
+        "MA10800",
+        "Door/Window sensor",
+        0,  # Unknown
+    ),
+    0x11: (
+        "TFA30.3060.01",
+        "4 Thermo-hygro-sensors",
+        7 * 60,  # 7 min
+    ),
+    0x12: (
+        "MA10230",
+        "Humidity Guard",
+        0,
+    ),
+    0x15: (
+        "MA10880",
+        "4 button switch",
+        0,  # Unknown
+    ),
+    0x18: (
+        "MA10238",
+        "Air pressure monitor",
+        6 * 60,  # 6 min
+    ),
 }
 
 
@@ -272,7 +327,7 @@ class Measurement:
             return "%"
         elif self._type == MeasurementType.WETNESS:
             return ["dry", "wet"]
-        elif self._type == MeasurementType.AIR_QUALITY:
+        elif self._type == MeasurementType.CO2:
             return "ppm"
         elif self._type == MeasurementType.AIR_PRESSURE:
             return "hPa"
@@ -312,7 +367,7 @@ class Measurement:
         elif self._type in [
             MeasurementType.RAIN,
             MeasurementType.AIR_PRESSURE,
-            MeasurementType.AIR_QUALITY,
+            MeasurementType.CO2,
             MeasurementType.WIND_SPEED,
             MeasurementType.GUST,
         ]:
@@ -404,7 +459,7 @@ class Measurement:
     ) -> None:
         self._value = ((value & 0x02) != 0) or ((value & 0x01) == 0)
 
-    def _set_air_quality(
+    def _set_CO2(
         self,
         value: bytes,
     ) -> None:
@@ -549,10 +604,12 @@ class Sensor:
 
         self._parent = parent
 
-        self._model = SENSOR_MODELS.get(self._type_id, UNKNOWN)
+        self._model, default_name, self._update_period = SENSOR_INFOS.get(
+            self._type_id, (UNKNOWN, UNKNOWN, 0)
+        )
 
         if name is None:
-            name = (SENSOR_NAMES.get(self._type_id, UNKNOWN) + " (%s)") % sensor_id
+            name = f"{default_name} ({sensor_id})"
         self._name = name
 
         self._counter = -1
@@ -581,7 +638,7 @@ class Sensor:
         elif self._type_id == 0x05:
             self._append(MeasurementType.TEMPERATURE)
             self._append(MeasurementType.HUMIDITY)
-            self._append(MeasurementType.AIR_QUALITY)
+            self._append(MeasurementType.CO2)
             self._append(MeasurementType.TEMPERATURE, "Outdoor")
         elif self._type_id == 0x06:
             self._append(MeasurementType.TEMPERATURE)
@@ -747,7 +804,7 @@ class Sensor:
         elif self._type_id == 0x05:
             self[0]._set_temperature(packet[16:18], packet[24:26])
             self[1]._set_humidity(packet[19], packet[27])
-            self[2]._set_air_quality(packet[20:22])
+            self[2]._set_CO2(packet[20:22])
             self[3]._set_temperature(packet[14:16], packet[22:24])
         elif self._type_id == 0x06:
             self[0]._set_temperature(packet[14:16], packet[20:22])
@@ -839,6 +896,10 @@ class Sensor:
             self.parse_packet(value)
         else:
             self._last_update = None
+
+    @property
+    def update_period(self) -> int:
+        return self._update_period
 
     @property
     def parent(self) -> Any:

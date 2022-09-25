@@ -86,6 +86,7 @@ class Gateway:
         self._send_data_to_cloud = True
         self._sensors: Dict[str, Sensor] = dict()
         self._initialized = False
+        self._is_online = False
 
     async def init(
         self,
@@ -164,6 +165,7 @@ class Gateway:
                 _LOGGER.debug("Gateway FIND_GATEWAY timeout")
                 continue
 
+        self._is_online = result is not None
         return result
 
     @staticmethod
@@ -303,6 +305,27 @@ class Gateway:
         if update_config and config is not None:
             self.parse_config(config)
 
+    async def ping(self, reattach_to_proxy: bool, timeout: int = 30) -> bool:
+        config = await self.get_config(timeout)
+        if config:
+            result: bool = self.check_config(config)
+            if result:
+                self._dhcp_ip = IPv4Address(config[11:15])
+                self._use_dhcp = config[15] != 0
+                self._fixed_ip = IPv4Address(config[16:20])
+                if self._attached:
+                    curr_use_proxy = config[114] != 0
+                    str_end_pos = config.find(0, 115, 180)
+                    curr_proxy = config[115:str_end_pos].decode("utf-8")
+                    if (
+                        (curr_use_proxy != self._use_proxy)
+                        or (curr_proxy != self._proxy)
+                    ) and reattach_to_proxy:
+                        self.set_config()
+            return result
+        else:
+            return False
+
     @staticmethod
     async def discover(
         local_ip_address: Optional[str] = None,
@@ -371,7 +394,6 @@ class Gateway:
         self._proxy_port = proxy_port
         self.set_handler(handler)
         self.set_config()
-        # await self.get_config()
 
     def detach_from_proxy(self) -> None:
         """Detachs the gateway from the proxy and restore original settings."""
@@ -486,8 +508,14 @@ class Gateway:
             )
             pos += 64
 
-    async def handle_update(self, code: str, packages: bytes) -> None:
+    async def handle_update(
+        self, code: str, packages: bytes, remote_ip: Optional[str] = None
+    ) -> None:
         """Handle update packets."""
+        _LOGGER.error("Handling update from %s", remote_ip)
+        self._is_online = True
+        if self._use_dhcp and self._dhcp_ip != remote_ip:
+            self._dhcp_ip = remote_ip
         if code == "00":
             self.handle_bootup_update(packages)
         elif code == "C0":
@@ -527,11 +555,29 @@ class Gateway:
 
     @property
     def serial(self) -> str:
-        return "80" + self._id[3:6].hex().upper()
+        return "80%s" % self._id[3:6].hex().upper()
 
     @property
     def version(self) -> str:
         return self._version
+
+    @property
+    def is_online(self) -> bool:
+        return self._is_online
+
+    @property
+    def ip_address(self) -> Optional[str]:
+        if self._is_online:
+            return str(self._dhcp_ip) if self._use_dhcp else str(self._fixed_ip)
+        else:
+            return None
+
+    @property
+    def url(self) -> Optional[str]:
+        if self._is_online:
+            return "http://%s/" % self.ip_address
+        else:
+            return None
 
     @property
     def last_seen(self) -> Optional[float]:
