@@ -112,7 +112,7 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
         2 * 60 * 60,  # 2 hours
     ),
     0x09: (
-        "MA10120",
+        "MA10320",
         "Pro Temperature/Humidity/Ext.Temperature sensor",
         3 * 60 + 30,  # 3.5 min
     ),
@@ -655,8 +655,8 @@ class Sensor:
             self._append(MeasurementType.TIME_SPAN)
         elif self._type_id == 0x09:
             self._append(MeasurementType.TEMPERATURE)
-            self._append(MeasurementType.HUMIDITY)
             self._append(MeasurementType.TEMPERATURE, "External")
+            self._append(MeasurementType.HUMIDITY)
         elif self._type_id == 0x0A:
             self._append(MeasurementType.ALARM, "", 1)
             self._append(MeasurementType.ALARM, "", 2)
