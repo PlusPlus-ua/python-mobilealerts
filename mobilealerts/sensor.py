@@ -124,7 +124,7 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
     0x0B: (
         "MA10660",
         "Wind sensor",
-        #2 * 60 * 60,  # 2 hours
+        # 2 * 60 * 60,  # 2 hours
         7 * 60,  # 7 min
     ),
     0x0E: (
