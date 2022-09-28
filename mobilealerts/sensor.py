@@ -124,7 +124,8 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
     0x0B: (
         "MA10660",
         "Wind sensor",
-        6 * 60,  # 6 min
+        #2 * 60 * 60,  # 2 hours
+        7 * 60,  # 7 min
     ),
     0x0E: (
         "TFA30.3312.02",
@@ -222,7 +223,7 @@ def _parse_rain_time_span(value: int) -> int:
 
 
 def _parse_wind_direction(value: int) -> float:
-    return ((value & 0xF0000000) >> 28) * 22.5
+    return ((value & 0xF0) >> 4) * 22.5
 
 
 def _parse_wind_speed(
@@ -230,7 +231,7 @@ def _parse_wind_speed(
     hibit: int,
     himask: int,
 ) -> float:
-    return ((value & 0xFF) & (0x100 if (hibit & himask != 0) else 0)) / 10
+    return ((value & 0xFF) | (0x100 if (hibit & himask != 0) else 0)) / 10
 
 
 def _parse_wind_time_span(value: int) -> int:
@@ -821,28 +822,27 @@ class Sensor:
             self[2]._set_rain_time_span(packet[18:28])
         elif self._type_id == 0x09:
             self[0]._set_temperature(packet[14:16], packet[20:22])
-            self[2]._set_humidity(packet[19], packet[25])
             self[1]._set_temperature(packet[16:18], packet[22:24])
+            self[2]._set_humidity(packet[19], packet[25])
         elif self._type_id == 0x0A:
-            self[0]._set_boolean(packet[14:16], 0x8000)
-            self[1]._set_boolean(packet[14:16], 0x4000)
-            self[2]._set_boolean(packet[14:16], 0x2000)
-            self[3]._set_boolean(packet[14:16], 0x1000)
-            self[4]._set_temperature(packet[16:18], None, False)
+            data: bytes = packet[14:16]
+            self[0]._set_boolean(data, 0x8000)
+            self[1]._set_boolean(data, 0x4000)
+            self[2]._set_boolean(data, 0x2000)
+            self[3]._set_boolean(data, 0x1000)
+            self[4]._set_temperature(data, None, False)
         elif self._type_id == 0x0B:
             pos = 15
             for n in range(0, 5):
-                self[0]._add_wind_direction(n, packet[pos + 3])
-                self[1]._add_wind_speed(n, packet[pos + 2], packet[pos + 3], 0x02)
-                self[2]._add_wind_speed(n, packet[pos + 1], packet[pos + 3], 0x01)
-                self[3]._add_wind_time_span(n, packet[pos])
+                self[0]._add_wind_direction(n, packet[pos])
+                self[1]._add_wind_speed(n, packet[pos + 1], packet[pos], 0x01)
+                self[2]._add_wind_speed(n, packet[pos + 2], packet[pos], 0x02)
+                self[3]._add_wind_time_span(n, packet[pos + 3])
                 pos += 4
         elif self._type_id == 0x0E:
             self[0]._set_temperature(packet[14:16], packet[19:21])
             self[0]._add_prior_temperature(packet[24:26])
             self[1]._set_humidity_hr(packet[16:18], packet[21:23], packet[26:28])
-            self[0]._set_temperature(packet[14:16], packet[18:20])
-            self[1]._set_temperature(packet[16:18], packet[20:22])
         elif self._type_id == 0x10:
             self[0]._set_boolean(packet[14:16], 0x8000)
             self[1]._set_door_window_time_span(packet[14:22])
@@ -853,8 +853,6 @@ class Sensor:
             self[5]._set_humidity(packet[21], packet[37])
             self[6]._set_temperature(packet[22:24], packet[38:40])
             self[7]._set_humidity(packet[25], packet[41])
-            self[0]._set_temperature(packet[26:28], packet[42:44])
-            self[1]._set_humidity(packet[29], packet[45])
         elif self._type_id == 0x12:
             self[0]._set_temperature(packet[18:20], packet[25:27])
             self[1]._set_humidity(packet[20], packet[27])

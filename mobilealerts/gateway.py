@@ -495,7 +495,11 @@ class Gateway:
             ):
                 await self._handler.sensor_updated(sensor)
         else:
-            _LOGGER.info("Update package checksum error")
+            _LOGGER.error(
+                "Update package checksum error %s, checksum %s",
+                package.hex().upper(),
+                hex(package_checksum),
+            )
 
     async def handle_sensors_update(self, packages: bytes) -> None:
         """Handle update packet for few sensors."""
@@ -512,7 +516,7 @@ class Gateway:
         self, code: str, packages: bytes, remote_ip: Optional[str] = None
     ) -> None:
         """Handle update packets."""
-        _LOGGER.error("Handling update from %s", remote_ip)
+        _LOGGER.debug("Handling update from %s", remote_ip)
         self._is_online = True
         if self._use_dhcp and self._dhcp_ip != remote_ip:
             self._dhcp_ip = remote_ip
