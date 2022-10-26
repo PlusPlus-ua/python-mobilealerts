@@ -38,7 +38,7 @@ aiohttp = "^3.8"
 importlib_metadata = {version = ">=4.5,<6.0", python = "<3.8"}
 [tool.poetry.dev-dependencies]
 bandit = "^1.7.4"
-black = {version = "^22.8", allow-prereleases = true}
+black = {version = "^22.10", allow-prereleases = true}
 darglint = "^1.8.0"
 isort = {extras = ["colors"], version = "^5.9.3"}
 mypy = "^0.982"
