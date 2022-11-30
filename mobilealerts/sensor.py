@@ -82,7 +82,7 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
         7 * 60,  # 7 min
     ),
     0x03: (
-        "MA10250",
+        "MA10200/250",
         "Temperature/Humidity",
         7 * 60,  # 7 min
     ),
@@ -199,7 +199,7 @@ def _parse_humidity_hr(
     if len(value) != 2:
         raise ValueError("Invalid air humidity value")
     result: int = int.from_bytes(value, "big")
-    return (result & 0x1FF) / 10
+    return (result & 0x3FF) / 10
 
 
 def _parse_air_preasure(
@@ -213,7 +213,9 @@ def _parse_air_preasure(
 
 def _parse_rain_time_span(value: int) -> int:
     time_unit = (value & 0xC000) >> 14
-    if time_unit == 1:  # hours
+    if time_unit == 0:  # days
+        time_mult = 24 * 60 * 60
+    elif time_unit == 1:  # hours
         time_mult = 60 * 60
     elif time_unit == 2:  # minutes
         time_mult = 60

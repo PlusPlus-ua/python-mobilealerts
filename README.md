@@ -12,13 +12,13 @@ Everything works in asynchronous way in order to build on the base of this libra
 ## Installation
 
 ```bash
-pip install -U python-mobilealerts
+pip install -U mobilealerts
 ```
 
 or install with `Poetry`
 
 ```bash
-poetry add python-mobilealerts
+poetry add mobilealerts
 ```
 
 ## 🛡 License
