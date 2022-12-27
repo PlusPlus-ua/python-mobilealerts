@@ -82,7 +82,7 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
         7 * 60,  # 7 min
     ),
     0x03: (
-        "MA10200/250",
+        "MA10200",
         "Temperature/Humidity",
         7 * 60,  # 7 min
     ),
@@ -128,7 +128,7 @@ SENSOR_INFOS: Dict[int, Tuple[str, str, int]] = {
         7 * 60,  # 7 min
     ),
     0x0E: (
-        "TFA30.3312.02",
+        "MA10250",
         "Professional Thermo/Hygro sensor",
         3 * 60 + 30,  # 3.5 min
     ),

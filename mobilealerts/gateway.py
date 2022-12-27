@@ -540,9 +540,15 @@ class Gateway:
         """Resend gateway's PUT request to cloud server."""
         if self._send_data_to_cloud:
             try:
+                proxy_to_use: str | None = None
+                if self.orig_use_proxy:
+                    proxy_to_use = ("http://%s:%s") % (
+                        self.orig_proxy, 
+                        self.orig_proxy_port
+                    )
                 async with aiohttp.ClientSession() as session:
-                    async with session.put(
-                        str(url), headers=headers, data=content
+                    async with session.put(str(url),
+                        proxy=proxy_to_use, headers=headers, data=content
                     ) as response:
                         response_content = await response.content.read()
                         _LOGGER.debug(
