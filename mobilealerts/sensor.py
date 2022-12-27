@@ -849,6 +849,8 @@ class Sensor:
             self[0]._set_boolean(packet[14:16], 0x8000)
             self[1]._set_door_window_time_span(packet[14:22])
         elif self._type_id == 0x11:
+            self[0]._set_temperature(packet[26:28], packet[42:44])
+            self[1]._set_humidity(packet[29], packet[45])
             self[2]._set_temperature(packet[14:16], packet[30:32])
             self[3]._set_humidity(packet[17], packet[33])
             self[4]._set_temperature(packet[18:20], packet[34:36])

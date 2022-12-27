@@ -51,6 +51,18 @@ from mobilealerts import Sensor
             "ce5d8bcb801275ffffffffff4023128e0b04060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
             "id: 75FFFFFFFFFF (battery good, last event: 2019-09-25 20:18:08)",
         ),
+        (
+            "ea63a5beaa2e111ec6ffb78900a400c1084300d6083c00d3083c00e8083400c1084400d6083d00d3083c40ea08341a00000000000000000000000000000000",
+            "id: 111EC6FFB789 (battery good, last seen: 2022-12-23 14:43:54)\n"
+            "Temperature: 23.2°C; previous: 23.4°C\n"
+            "Humidity: 52%; previous: 52%\n"
+            "External temperature 1: 19.3°C; previous: 19.3°C\n"
+            "External humidity 1: 67%; previous: 68%\n"
+            "External temperature 2: 21.4°C; previous: 21.4°C\n"
+            "External humidity 2: 60%; previous: 61%\n"
+            "External temperature 3: 21.1°C; previous: 21.1°C\n"
+            "External humidity 3: 60%; previous: 60%",
+        ),
     ],
 )
 def test_sensor(data: str, expected: str) -> None:
