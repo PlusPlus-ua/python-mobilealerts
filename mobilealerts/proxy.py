@@ -88,7 +88,7 @@ class Proxy:
                             identify[2], content, request.remote
                         )
                         await gateway.resend_data_to_cloud(
-                            request.rel_url, headers, content
+                            request.url, headers, content
                         )
                     else:
                         _LOGGER.error(

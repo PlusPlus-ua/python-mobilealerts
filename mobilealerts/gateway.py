@@ -546,6 +546,11 @@ class Gateway:
                         self.orig_proxy,
                         self.orig_proxy_port,
                     )
+                    _LOGGER.debug(
+                        "Sending data to cloud: %s via proxy: %s", url, proxy_to_use
+                    )
+                else:
+                    _LOGGER.debug("Sending data to cloud: %s", url)
                 async with aiohttp.ClientSession() as session:
                     async with session.put(
                         str(url), proxy=proxy_to_use, headers=headers, data=content
